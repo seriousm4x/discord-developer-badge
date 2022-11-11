@@ -1,0 +1,40 @@
+name: Cross-Build
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        goos: ['linux', 'freebsd', 'openbsd', 'windows', 'darwin']
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: 'go.mod'
+      - name: Install dependencies
+        run: go get .
+      - name: Run Build
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+        shell: bash
+        continue-on-error: true
+        run: |
+          GOOS=$GOOS go build -trimpath -ldflags "-s -w" -o devbadge-"$GOOS"-amd64 2> /dev/null
+          if [ $? -ne 0 ]; then
+            echo "::warning ::$GOOS Build Failed"
+            exit 0
+          fi
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: devbadge-*
